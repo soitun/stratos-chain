@@ -130,7 +130,7 @@ func (k Keeper) uozSupply(ctx sdk.Context) (remaining, total sdk.Int) {
 	remaining = k.RegisterKeeper.GetRemainingOzoneLimit(ctx)
 	// TODO create a dedicated storeKey in pot module for total ozone supply and keep updating it along with related operations (like AddResourceNodeStake)
 	// fake return of total
-	total, _ = sdk.NewIntFromString("-1")
+	total = k.PotKeeper.GetTotalUnissuedPrepay(ctx).Amount
 	return remaining, total
 }
 
