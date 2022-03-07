@@ -22,19 +22,21 @@ type MsgCreateResourceNode struct {
 	NetworkID    string         `json:"network_id" yaml:"network_id"`
 	PubKey       crypto.PubKey  `json:"pubkey" yaml:"pubkey"`
 	Value        sdk.Coin       `json:"value" yaml:"value"`
+	Tier         NodeTier       `json:"tier" yaml:"tier"`
 	OwnerAddress sdk.AccAddress `json:"owner_address" yaml:"owner_address"`
 	Description  Description    `json:"description" yaml:"description"`
 	NodeType     string         `json:"node_type" yaml:"node_type"`
 }
 
 // NewMsgCreateResourceNode NewMsg<Action> creates a new Msg<Action> instance
-func NewMsgCreateResourceNode(networkID string, pubKey crypto.PubKey, value sdk.Coin,
+func NewMsgCreateResourceNode(networkID string, pubKey crypto.PubKey, value sdk.Coin, tier NodeTier,
 	ownerAddr sdk.AccAddress, description Description, nodeType string,
 ) MsgCreateResourceNode {
 	return MsgCreateResourceNode{
 		NetworkID:    networkID,
 		PubKey:       pubKey,
 		Value:        value,
+		Tier:         tier,
 		OwnerAddress: ownerAddr,
 		Description:  description,
 		NodeType:     nodeType,
@@ -59,6 +61,17 @@ func (msg MsgCreateResourceNode) ValidateBasic() error {
 	}
 	if !msg.Value.IsPositive() {
 		return ErrValueNegative
+	}
+
+	// MinResourceNodeTier min tier is for suspended resource node, newly created node starts at MinResourceNodeTier+1
+	if msg.Tier != CABINET && msg.Tier != SPECIAL_BUILD && msg.Tier != PC {
+		return ErrNodeTier
+	}
+
+	if (msg.Tier == PC && (msg.Value.Amount.LT(sdk.NewInt(MinStakeTier1)) || msg.Value.Amount.GTE(sdk.NewInt(MinStakeTier2)))) ||
+		(msg.Tier == SPECIAL_BUILD && (msg.Value.Amount.LT(sdk.NewInt(MinStakeTier2)) || msg.Value.Amount.GTE(sdk.NewInt(MinStakeTier3)))) ||
+		(msg.Tier == CABINET && msg.Value.Amount.LT(sdk.NewInt(MinStakeTier3))) {
+		return ErrTierNotMatchStake
 	}
 
 	if msg.Description == (Description{}) {

@@ -14,11 +14,17 @@ import (
 )
 
 type NodeType uint8
+type NodeTier uint8
 
 const (
 	STORAGE     NodeType = 4
 	DATABASE    NodeType = 2
 	COMPUTATION NodeType = 1
+
+	CABINET       NodeTier = 3
+	SPECIAL_BUILD NodeTier = 2
+	PC            NodeTier = 1
+	SUSPENDED     NodeTier = 0
 )
 
 func (n NodeType) Type() string {
@@ -37,6 +43,20 @@ func (n NodeType) Type() string {
 		return "database"
 	case 1:
 		return "computation"
+	}
+	return "UNKNOWN"
+}
+
+func (n NodeTier) Type() string {
+	switch n {
+	case 3:
+		return "cabinet"
+	case 2:
+		return "special_build"
+	case 1:
+		return "pc"
+	case 0:
+		return "suspended"
 	}
 	return "UNKNOWN"
 }
@@ -92,11 +112,12 @@ type ResourceNode struct {
 	Description  Description    `json:"description" yaml:"description"`     // description terms for the resource node
 	NodeType     string         `json:"node_type" yaml:"node_type"`
 	CreationTime time.Time      `json:"creation_time" yaml:"creation_time"`
+	NodeTier     NodeTier       `json:"node_tier" yaml:"node_tier"`
 }
 
 // NewResourceNode - initialize a new resource node
 func NewResourceNode(networkID string, pubKey crypto.PubKey, ownerAddr sdk.AccAddress,
-	description Description, nodeType string, creationTime time.Time) ResourceNode {
+	description Description, nodeType string, creationTime time.Time, nodeTier NodeTier) ResourceNode {
 	return ResourceNode{
 		NetworkID:    networkID,
 		PubKey:       pubKey,
@@ -107,6 +128,7 @@ func NewResourceNode(networkID string, pubKey crypto.PubKey, ownerAddr sdk.AccAd
 		Description:  description,
 		NodeType:     nodeType,
 		CreationTime: creationTime,
+		NodeTier:     nodeTier,
 	}
 }
 
@@ -125,7 +147,9 @@ func (v ResourceNode) String() string {
 		Owner Address: 		%s
   		Description:		%s
   		CreationTime:		%s
-	}`, v.NetworkID, pubKey, v.Suspend, v.Status, v.Tokens, v.OwnerAddress, v.Description, v.CreationTime)
+  		NodeType:			%s
+  		NodeTier:			%s
+	}`, v.NetworkID, pubKey, v.Suspend, v.Status, v.Tokens, v.OwnerAddress, v.Description, v.CreationTime, v.NodeType, v.NodeTier.Type())
 }
 
 // AddToken adds tokens to a resource node

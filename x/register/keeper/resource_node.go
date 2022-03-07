@@ -289,11 +289,12 @@ func (k Keeper) GetResourceNodeListByMoniker(ctx sdk.Context, moniker string) (r
 }
 
 func (k Keeper) RegisterResourceNode(ctx sdk.Context, networkID string, pubKey crypto.PubKey, ownerAddr sdk.AccAddress,
-	description types.Description, nodeType string, stake sdk.Coin) (ozoneLimitChange sdk.Int, err error) {
+	description types.Description, nodeType string, stake sdk.Coin, nodeTier types.NodeTier) (ozoneLimitChange sdk.Int, confirmedTier types.NodeTier, err error) {
 
-	resourceNode := types.NewResourceNode(networkID, pubKey, ownerAddr, description, nodeType, ctx.BlockHeader().Time)
+	resourceNode := types.NewResourceNode(networkID, pubKey, ownerAddr, description, nodeType, ctx.BlockHeader().Time, nodeTier)
 	ozoneLimitChange, err = k.AddResourceNodeStake(ctx, resourceNode, stake)
-	return ozoneLimitChange, err
+	confirmedTier = nodeTier
+	return ozoneLimitChange, confirmedTier, err
 }
 
 func (k Keeper) UpdateResourceNode(ctx sdk.Context, networkID string, description types.Description, nodeType string,

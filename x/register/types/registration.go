@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
@@ -13,6 +14,10 @@ const (
 	MaxWebsiteLength         = 140
 	MaxSecurityContactLength = 140
 	MaxDetailsLength         = 280
+
+	MinStakeTier1 = 100 * 1000000000  // 100 stos
+	MinStakeTier2 = 500 * 1000000000  // 500 stos
+	MinStakeTier3 = 5000 * 1000000000 // 5000 stos
 )
 
 // Description - description fields for a resource/indexing node
