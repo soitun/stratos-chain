@@ -2,6 +2,7 @@ package ante
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/tendermint/tendermint/rpc/core"
@@ -329,41 +330,43 @@ func NewEthIncrementSenderSequenceDecorator(ak evmtypes.AccountKeeper) EthIncrem
 // contract creation, the nonce will be incremented during the transaction execution and not within
 // this AnteHandler decorator.
 func (issd EthIncrementSenderSequenceDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (sdk.Context, error) {
-	for _, msg := range tx.GetMsgs() {
-		msgEthTx, ok := msg.(*evmtypes.MsgEthereumTx)
-		if !ok {
-			return ctx, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "invalid message type %T, expected %T", msg, (*evmtypes.MsgEthereumTx)(nil))
-		}
+	if !ctx.IsCheckTx() && !simulate {
+		for _, msg := range tx.GetMsgs() {
+			msgEthTx, ok := msg.(*evmtypes.MsgEthereumTx)
+			if !ok {
+				return ctx, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "invalid message type %T, expected %T", msg, (*evmtypes.MsgEthereumTx)(nil))
+			}
 
-		txData, err := evmtypes.UnpackTxData(msgEthTx.Data)
-		if err != nil {
-			return ctx, sdkerrors.Wrap(err, "failed to unpack tx data")
-		}
+			txData, err := evmtypes.UnpackTxData(msgEthTx.Data)
+			if err != nil {
+				return ctx, sdkerrors.Wrap(err, "failed to unpack tx data")
+			}
 
-		// increase sequence of sender
-		acc := issd.ak.GetAccount(ctx, msgEthTx.GetFrom())
-		if acc == nil {
-			return ctx, sdkerrors.Wrapf(
-				sdkerrors.ErrUnknownAddress,
-				"account %s is nil", common.BytesToAddress(msgEthTx.GetFrom().Bytes()),
-			)
-		}
-		nonce := acc.GetSequence()
+			// increase sequence of sender
+			acc := issd.ak.GetAccount(ctx, msgEthTx.GetFrom())
+			if acc == nil {
+				return ctx, sdkerrors.Wrapf(
+					sdkerrors.ErrUnknownAddress,
+					"account %s is nil", common.BytesToAddress(msgEthTx.GetFrom().Bytes()),
+				)
+			}
+			nonce := acc.GetSequence()
 
-		// we merged the nonce verification to nonce increment, so when tx includes multiple messages
-		// with same sender, they'll be accepted.
-		if txData.GetNonce() != nonce {
-			return ctx, sdkerrors.Wrapf(
-				sdkerrors.ErrInvalidSequence,
-				"invalid nonce; got %d, expected %d", txData.GetNonce(), nonce,
-			)
-		}
+			// we merged the nonce verification to nonce increment, so when tx includes multiple messages
+			// with same sender, they'll be accepted.
+			if txData.GetNonce() != nonce {
+				return ctx, sdkerrors.Wrapf(
+					sdkerrors.ErrInvalidSequence,
+					"invalid nonce; got %d, expected %d", txData.GetNonce(), nonce,
+				)
+			}
 
-		if err := acc.SetSequence(nonce + 1); err != nil {
-			return ctx, sdkerrors.Wrapf(err, "failed to set sequence to %d", acc.GetSequence()+1)
-		}
+			if err := acc.SetSequence(nonce + 1); err != nil {
+				return ctx, sdkerrors.Wrapf(err, "failed to set sequence to %d", acc.GetSequence()+1)
+			}
 
-		issd.ak.SetAccount(ctx, acc)
+			issd.ak.SetAccount(ctx, acc)
+		}
 	}
 
 	return next(ctx, tx, simulate)
@@ -556,11 +559,16 @@ func NewEthTxOverrideDecorator(ak evmtypes.AccountKeeper, ek EVMKeeper, txDecode
 }
 
 func (tod EthTxOverrideDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (newCtx sdk.Context, err error) {
-	if ctx.IsCheckTx() && !simulate {
+	fmt.Println("#################### Enter EthTxOverrideDecorator")
+	fmt.Println("ctx.IsCheckTx() = ", ctx.IsCheckTx())
+	fmt.Println("simulate = ", simulate)
+	if !ctx.IsCheckTx() && !simulate {
 		res, err := core.UnconfirmedTxs(&rpctypes.Context{}, nil)
 		if err != nil {
 			return ctx, sdkerrors.Wrapf(sdkerrors.ErrPanic, "get pending txs from mem pool failed")
 		}
+		fmt.Println("res.Total = ", res.Total)
+		fmt.Println("res.Count = ", res.Count)
 
 		for _, msg := range tx.GetMsgs() {
 			msgEthTx, ok := msg.(*evmtypes.MsgEthereumTx)
@@ -576,14 +584,19 @@ func (tod EthTxOverrideDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulat
 			from := msgEthTx.GetFrom()
 			nonce := txData.GetNonce()
 			gas := txData.GetGas()
+			fmt.Println("from  = ", from.String())
+			fmt.Println("nonce = ", nonce)
+			fmt.Println("gas   = ", gas)
 
 			for _, txBz := range res.Txs {
+				fmt.Println("1111111111111111111111111111111111")
 				pendingTx, err := tod.txDecoder(txBz)
 				if err != nil {
 					return ctx, err
 				}
 
 				for _, pendingMsg := range pendingTx.GetMsgs() {
+					fmt.Println("222222222222222222222222222222222222")
 					pendingMsgEthTx, ok := pendingMsg.(*evmtypes.MsgEthereumTx)
 					if !ok {
 						return ctx, sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "invalid message type %T, expected %T", pendingMsg, (*evmtypes.MsgEthereumTx)(nil))
@@ -594,7 +607,11 @@ func (tod EthTxOverrideDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulat
 						return ctx, sdkerrors.Wrap(err, "failed to unpack tx data")
 					}
 
+					fmt.Println("pendingMsgEthTx.GetFrom()  = ", pendingMsgEthTx.GetFrom().String())
+					fmt.Println("pendingTxData.GetNonce()   = ", pendingTxData.GetNonce())
+					fmt.Println("pendingTxData.GetGas()     = ", pendingTxData.GetGas())
 					if pendingMsgEthTx.GetFrom().Equals(from) && pendingTxData.GetNonce() == nonce && pendingTxData.GetGas() > gas {
+						fmt.Println("errrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr")
 						//find tx has same nonce & gas from same sender, let this tx fail in order to execute pendingMsgEthTx first
 						return ctx, sdkerrors.Wrapf(sdkerrors.ErrWrongSequence, "transaction is about to be overridden %v", tx)
 					}
